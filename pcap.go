@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"time"
@@ -10,8 +9,11 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
+// SnapLen l
+var SnapLen int32 = 1518
+
 func PcapInit(config *DrcomConfig) *pcap.Handle {
-	handle, err := pcap.OpenLive(config.Local.NIC, 1518, true, time.Duration(config.Local.EAPTimeout))
+	handle, err := pcap.OpenLive(config.Local.NIC, SnapLen, true, time.Duration(config.Local.EAPTimeout))
 	defer handle.Close()
 
 	if err != nil {
@@ -29,12 +31,12 @@ func PcapInit(config *DrcomConfig) *pcap.Handle {
 }
 
 // MakeEthernetHeader h
-func MakeEthernetHeader(config *DrcomConfig) {
+func MakeEthernetHeader(config *DrcomConfig) *layers.Ethernet {
 	ethernetLayer := &layers.Ethernet{
 		SrcMAC:       net.HardwareAddr(MacProcessor(config.Local.MAC)),
 		DstMAC:       net.HardwareAddr(MacProcessor(config.Remote.MAC)),
 		EthernetType: 0x888e, // 802.1x
 	}
 
-	fmt.Println(ethernetLayer.SrcMAC, ethernetLayer.DstMAC)
+	return ethernetLayer
 }

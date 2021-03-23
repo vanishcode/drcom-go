@@ -84,7 +84,6 @@ func main() {
 	config.Local.MAC = GetMacByNic(config.Local.NIC)
 
 	pcap.Version()
-	MakeEthernetHeader(config)
 
 	State = OFFLINE_PROCESSING
 
@@ -99,8 +98,8 @@ func online(config *DrcomConfig) {
 
 	if config.Remote.UseBroadcast == 1 {
 
-		Logoff(EthernetNearestMac)
-		Logoff(EthernetNearestMac)
+		Logoff(config, EthernetNearestMac)
+		Logoff(config, EthernetNearestMac)
 
 		Start(EthernetBroadcast)
 		ResponseIdentity(EthernetBroadcast)
@@ -110,8 +109,8 @@ func online(config *DrcomConfig) {
 
 		mac := MacProcessor(config.Remote.MAC)
 
-		Logoff(mac)
-		Logoff(mac)
+		Logoff(config, mac)
+		Logoff(config, mac)
 
 		Start(mac)
 		ResponseIdentity(mac)
