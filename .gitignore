@@ -31,8 +31,5 @@ vendor/
 .DS_Store
 Thumbs.db
 
-# Config with credentials
-config.yaml
-
 # Claude AI data
 .claude/

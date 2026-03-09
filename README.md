@@ -49,8 +49,8 @@ Copy `config.yaml` and edit with your credentials:
 general:
   # Authentication mode: 0 = EAP + U31 (dormitory), 1 = U31 only, 2 = EAP + U62
   mode: 0
-  username: "150420218"
-  password: "19980420"
+  username: "150420201"
+  password: "password"
   # Auto connect on startup
   auto_online: true
   # Auto reconnect on disconnect

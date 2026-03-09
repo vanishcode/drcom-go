@@ -1,0 +1,38 @@
+# DrCOM-Go config file
+
+general:
+  # Authentication mode: 0 = EAP + U31 (dormitory), 1 = U31 only, 2 = EAP + U62
+  mode: 0
+  username: "150420201"
+  password: "password"
+  # Auto connect on startup
+  auto_online: true
+  # Auto reconnect on disconnect
+  auto_redial: true
+
+local:
+  # Network interface name (e.g., en0 on macOS, eth0 on Linux)
+  nic: en0
+  hostname: "EasyDrcom for HITwh"
+  kernel_version: "v0.9"
+  # EAP pcap read timeout in milliseconds
+  eap_timeout: 1000
+  # UDP socket read timeout in milliseconds
+  udp_timeout: 2000
+
+remote:
+  # DrCOM gateway IP
+  ip: "172.25.8.4"
+  # DrCOM gateway port
+  port: 61440
+  # Use broadcast MAC for EAP (true for most setups)
+  use_broadcast: true
+  # Gateway MAC (required only if use_broadcast is false)
+  # mac: "00:1a:a9:c3:3a:59"
+
+fake:
+  # Enable fake credentials (for testing/proxy)
+  enable: false
+  # mac: "xx:xx:xx:xx:xx:xx"
+  # username: "fake_user"
+  # password: "fake_pass"
