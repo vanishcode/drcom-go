@@ -1,32 +1,114 @@
-# drcom-go
-Drcom P 版 golang 实现（u62）
+# DrCOM-Go
 
-为了复习 Golang 和 C++，所以心血来潮，干脆移植一个项目。
+A Go implementation of the DrCOM campus network authentication client for Harbin Institute of Technology (Weihai). Rewritten from [EasyDrcom](https://github.com/coverxit/EasyDrcom) (C++).
 
-**理论上支持所有可以运行（或交叉编译）golang的平台**
+Supports EAP/802.1X authentication and DrCOM U31/U62 keep-alive protocols.
 
-> 配置文件直接从学长那里偷的  ╮(￣▽￣"")╭  github.com/coverxit/EasyDrcom
+## Prerequisites
 
-学校现在已经用锐捷 web 认证了，更先进，而且我早已经毕业了XD，所以，我没有测试条件
+- Go 1.21+
+- libpcap
+  - **macOS**: included with Xcode Command Line Tools
+  - **Debian/Ubuntu**: `sudo apt install libpcap-dev`
+  - **RHEL/Fedora**: `sudo dnf install libpcap-devel`
 
-一些我没做的
+## Build
 
-- 只支持 宿舍区模式2
+```bash
+go build -o drcom-go .
+```
 
-- 没有 u31 版本支持
+## Usage
 
-- 没有掉线重连
+```bash
+# Run with default config (./config.yaml)
+sudo ./drcom-go
 
-- 没有日志
+# Run with custom config path
+sudo ./drcom-go -c /path/to/config.yaml
+```
 
-如果你想用 openwrt 设备运行本程序，可自行编译，百度搜索“golang交叉编译”，并且需要注意设备的flash大小是否可以装下编译好的软件包，以及内存是否够用
+Root/sudo is required for raw packet capture (802.1X).
 
-任何问题在issue中提问
+### Interactive Commands
 
------------
+| Command   | Description              |
+|-----------|--------------------------|
+| `online`  | Connect to the network   |
+| `offline` | Disconnect               |
+| `quit`    | Disconnect and exit      |
+| `help`    | Show available commands  |
 
-TODO
+If `AutoOnline=true` in config, the client connects automatically on startup.
 
-- 自动重拨
+## Configuration
 
-- 排错机制
+Copy `config.yaml` and edit with your credentials:
+
+```yaml
+general:
+  # Authentication mode: 0 = EAP + U31 (dormitory), 1 = U31 only, 2 = EAP + U62
+  mode: 0
+  username: "150420218"
+  password: "19980420"
+  # Auto connect on startup
+  auto_online: true
+  # Auto reconnect on disconnect
+  auto_redial: true
+
+local:
+  # Network interface name (e.g., en0 on macOS, eth0 on Linux)
+  nic: en0
+  hostname: "EasyDrcom for HITwh"
+  kernel_version: "v0.9"
+  # EAP pcap read timeout in milliseconds
+  eap_timeout: 1000
+  # UDP socket read timeout in milliseconds
+  udp_timeout: 2000
+
+remote:
+  # DrCOM gateway IP
+  ip: "172.25.8.4"
+  # DrCOM gateway port
+  port: 61440
+  # Use broadcast MAC for EAP (true for most setups)
+  use_broadcast: true
+  # Gateway MAC (required only if use_broadcast is false)
+  # mac: "00:1a:a9:c3:3a:59"
+```
+
+### Authentication Modes
+
+| Mode | Protocol     | Use Case                          |
+|------|--------------|-----------------------------------|
+| 0    | EAP + U31    | Dormitory (802.1X + full DrCOM)   |
+| 1    | U31 only     | No EAP required                   |
+| 2    | EAP + U62    | Dormitory (802.1X + keep-alive only) |
+
+## Project Structure
+
+```
+main.go                    CLI entry point, command loop
+config/config.go           YAML config parsing
+session/session.go         State machine, online/offline orchestration
+protocol/
+  eap/
+    packet.go              EAP frame constants and builders
+    eap.go                 802.1X EAP authentication (pcap-based)
+  drcom/
+    drcom.go               DrCOMDealer interface
+    packet.go              Shared packet constants and parsers
+    u31.go                 U31 full protocol (login + keep-alive)
+    u62.go                 U62 keep-alive only
+  udp/
+    udp.go                 UDP transport with timeout and retry
+util/
+  md5.go                   MD5 convenience wrapper
+  net.go                   NIC MAC/IP retrieval
+  hex.go                   Hex dump for debug logging
+  log.go                   Structured logger with section prefixes
+```
+
+## License
+
+Based on [EasyDrcom](https://github.com/coverxit/EasyDrcom), licensed under the Apache License 2.0.
