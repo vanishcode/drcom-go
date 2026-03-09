@@ -1,134 +1,121 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
-	"log"
-	"net"
 	"os"
-	"time"
+	"strings"
 
-	"github.com/google/gopacket/pcap"
-	"gopkg.in/ini.v1"
+	"github.com/vanishcode/drcom-go/config"
+	"github.com/vanishcode/drcom-go/session"
+	"github.com/vanishcode/drcom-go/util"
 )
 
-const (
-	App     string = "DrCOM(P) Golang"
-	Version string = "v0.1"
-	Author  string = "by vanishcode"
-	Date    string = "2021.3.23"
-)
-
-// DrcomConfig 配置，详见conf配置文件注释
-type DrcomConfig struct {
-	General struct {
-		UserName   string
-		PassWord   string
-		Mode       int
-		AutoOnline int
-		AutoRedial int
-	}
-	Remote struct {
-		IP           string
-		Port         int
-		UseBroadcast int
-		MAC          string
-	}
-	Local struct {
-		IP            string
-		MAC           string
-		NIC           string
-		EAPTimeout    int
-		UDPTimeout    int
-		HostName      string
-		KernelVersion string
-	}
-}
-
-// 登录状态
-var State int
-
-const (
-	OFFLINE_PROCESSING = 0
-	OFFLINE_NOTIFY     = 1
-	OFFLINE            = 2
-	ONLINE_PROCESSING  = 3
-	ONLINE             = 4
-)
-
-var (
-	EthernetBroadcast  = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-	EthernetNearestMac = net.HardwareAddr{0x01, 0x80, 0xc2, 0x00, 0x00, 0x03}
-)
+var log = util.NewLogger(util.SectionSYS)
 
 func main() {
-	// Link Start!
-	fmt.Println("--------------------------------------------")
-	fmt.Println(App, Version, Author, Date)
-	fmt.Println("--------------------------------------------")
+	configPath := flag.String("c", "config.yaml", "path to config file")
+	flag.Parse()
 
-	var configFilePath string
+	fmt.Println("[DrCOM-Go v0.9 - Go rewrite of EasyDrcom for HITwh]")
+	fmt.Println()
 
-	flag.StringVar(&configFilePath, "c", "drcom.conf", "默认为同目录drcom.conf文件")
-
-	config := new(DrcomConfig)
-
-	err := ini.MapTo(config, configFilePath)
+	log.Info("Loading config", "path", *configPath)
+	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		log.Println("打开配置文件失败")
-		os.Exit(-1)
+		log.Error("Failed to load config", "err", err)
+		os.Exit(1)
 	}
 
-	// ip和mac可以根据网卡名获取
-	config.Local.IP = GetIpByNic(config.Local.NIC)
-	config.Local.MAC = GetMacByNic(config.Local.NIC)
+	log.Info("Config loaded",
+		"user", cfg.General.UserName,
+		"mode", cfg.General.Mode,
+		"nic", cfg.Local.NIC,
+		"ip", cfg.Local.IP,
+		"mac", cfg.Local.MAC)
 
-	pcap.Version()
+	sess, err := session.New(cfg)
+	if err != nil {
+		log.Error("Failed to initialize session", "err", err)
+		os.Exit(1)
+	}
+	defer sess.Close()
 
-	State = OFFLINE_PROCESSING
+	log.Info("Initialization done")
 
-	online(config)
-
-}
-
-func online(config *DrcomConfig) {
-	State = ONLINE_PROCESSING
-
-	PcapInit(config)
-
-	if config.Remote.UseBroadcast == 1 {
-
-		Logoff(config, EthernetNearestMac)
-		Logoff(config, EthernetNearestMac)
-
-		Start(EthernetBroadcast)
-		ResponseIdentity(EthernetBroadcast)
-		ResponseMd5Challenge(EthernetBroadcast)
-
+	if cfg.General.AutoOnline {
+		log.Info("Auto-connecting...")
+		if err := sess.GoOnline(); err != nil {
+			log.Error("Failed to go online", "err", err)
+		}
 	} else {
-
-		mac := MacProcessor(config.Remote.MAC)
-
-		Logoff(config, mac)
-		Logoff(config, mac)
-
-		Start(mac)
-		ResponseIdentity(mac)
-		ResponseMd5Challenge(mac)
+		fmt.Println("Enter 'online' to connect.")
 	}
 
-	keepalive(State)
+	fmt.Println("Commands: online, offline, quit, help")
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		cmd := strings.TrimSpace(scanner.Text())
+		switch cmd {
+		case "online":
+			state := sess.GetState()
+			switch state {
+			case session.StateOnline:
+				fmt.Println("Already online!")
+			case session.StateOnlineProcessing:
+				fmt.Println("Online processing...")
+			case session.StateOfflineProcessing:
+				fmt.Println("Offline processing...")
+			case session.StateOffline:
+				log.Info("Going online...")
+				if err := sess.GoOnline(); err != nil {
+					log.Error("Failed to go online", "err", err)
+				}
+			}
 
-}
+		case "offline":
+			state := sess.GetState()
+			switch state {
+			case session.StateOffline:
+				fmt.Println("Not online.")
+			case session.StateOnlineProcessing:
+				fmt.Println("Online processing, please wait...")
+			case session.StateOfflineProcessing:
+				fmt.Println("Already going offline...")
+			case session.StateOnline:
+				log.Info("Going offline...")
+				if err := sess.GoOffline(); err != nil {
+					log.Error("Failed to go offline", "err", err)
+				}
+			}
 
-func keepalive(state int) {
-	if state != OFFLINE_PROCESSING {
-		for {
-			KeepAlivePacket1()
-			KeepAlivePacket1()
-			time.Sleep(time.Duration(20) * time.Second)
+		case "quit":
+			state := sess.GetState()
+			if state == session.StateOnlineProcessing || state == session.StateOfflineProcessing {
+				fmt.Println("Please wait for processing to finish.")
+				continue
+			}
+			if state == session.StateOnline {
+				log.Info("Going offline before quit...")
+				sess.GoOffline()
+			}
+			fmt.Println("Bye!")
+			return
 
-			state = ONLINE
+		case "help":
+			fmt.Println("DrCOM-Go v0.9 - Go rewrite of EasyDrcom for HITwh")
+			fmt.Println("Commands:")
+			fmt.Println("  online  - connect to network")
+			fmt.Println("  offline - disconnect from network")
+			fmt.Println("  quit    - exit program")
+			fmt.Println("  help    - show this help")
+
+		case "":
+			// ignore empty input
+
+		default:
+			fmt.Printf("Unknown command: %s\n", cmd)
 		}
 	}
 }
