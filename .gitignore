@@ -1,18 +1,38 @@
-# Binaries for programs and plugins
+# Binaries
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+drcom-go
 
-# Test binary, built with `go test -c`
+# Test binary
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Go build cache
+*.o
+*.a
+
+# Go coverage
 *.out
+*.prof
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Dependency directories
+vendor/
 
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
-drcom
+Thumbs.db
+
+# Config with credentials
+config.yaml
+
+# Claude AI data
+.claude/
